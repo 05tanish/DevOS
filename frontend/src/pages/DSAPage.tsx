@@ -8,7 +8,7 @@ import { subDays } from 'date-fns';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
 import { DSA_TOPICS, DSA_PLATFORMS, DSA_DIFFICULTIES } from '../lib/constants';
-import type { DsaProblem, DsaDifficulty, DsaPlatform, DsaTopic } from '../types';
+import type { DsaProblem, DsaDifficulty, DsaPlatform, DsaTopic, GfgProfileStats } from '../types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -64,7 +64,7 @@ export function DSAPage() {
   } | null>(null);
   const [profileStats, setProfileStats] = useState<{
     leetcode: { totalSolved: number; easySolved: number; mediumSolved: number; hardSolved: number; acceptanceRate: number; ranking: number } | null;
-    gfg: { totalSolved: number } | null;
+    gfg: GfgProfileStats | null;
   } | null>(null);
   const [togglingGoal, setTogglingGoal] = useState(false);
 
@@ -433,26 +433,81 @@ export function DSAPage() {
 
         {/* GFG Tracker Card */}
         {profileStats && profileStats.gfg ? (
-          <div className="bg-card border border-border p-4 rounded-xl flex flex-col justify-between gap-3">
+          <div className="bg-card border border-border p-4 rounded-xl flex flex-col justify-between gap-3 shadow-sm hover:border-emerald-500/30 transition-all">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <GraduationCap className="w-4 h-4 text-emerald-500" /> GeeksforGeeks Profile
               </h3>
-              <span className="text-[10px] text-muted-foreground">Scraper Active</span>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                  Live Synced
+                </Badge>
+                {profileStats.gfg.profileUrl && (
+                  <a
+                    href={profileStats.gfg.profileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-emerald-400 transition-colors"
+                    title="Open GeeksforGeeks Profile"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-4 bg-secondary border border-border/50 p-3 rounded-lg">
-              <div className="w-10 h-10 rounded bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold text-sm shrink-0">
-                GFG
-              </div>
-              <div>
-                <p className="text-base font-bold text-foreground">{profileStats.gfg.totalSolved} Solved</p>
-                <p className="text-[9px] text-muted-foreground">Total Problems Solved</p>
+            <div className="flex items-center gap-3 bg-secondary/40 border border-border/50 p-2.5 rounded-lg">
+              {profileStats.gfg.avatar ? (
+                <img
+                  src={profileStats.gfg.avatar}
+                  alt={profileStats.gfg.displayName || profileStats.gfg.username}
+                  className="w-10 h-10 rounded-full object-cover border border-emerald-500/50 shrink-0"
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold text-xs shrink-0">
+                  GFG
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-bold text-foreground truncate">
+                    {profileStats.gfg.displayName || profileStats.gfg.username}
+                  </p>
+                  <span className="text-xs font-mono font-bold text-emerald-400">
+                    {profileStats.gfg.totalSolved} Solved
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+                  <span>@{profileStats.gfg.username}</span>
+                  {profileStats.gfg.totalActiveDays !== undefined && profileStats.gfg.totalActiveDays > 0 && (
+                    <>
+                      <span>•</span>
+                      <span>{profileStats.gfg.totalActiveDays} active days</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="text-[10px] text-muted-foreground pt-1 border-t border-border/40">
-              Syncs with public profile stats dynamically
+            {/* Difficulty breakdown */}
+            <div className="grid grid-cols-4 gap-1.5 text-center">
+              <div className="bg-secondary/40 rounded p-1">
+                <span className="text-[9px] text-sky-400 uppercase font-semibold">Basic</span>
+                <p className="text-xs font-bold text-foreground">{profileStats.gfg.byDifficulty?.basic ?? 0}</p>
+              </div>
+              <div className="bg-secondary/40 rounded p-1">
+                <span className="text-[9px] text-emerald-400 uppercase font-semibold">Easy</span>
+                <p className="text-xs font-bold text-emerald-400">{profileStats.gfg.byDifficulty?.easy ?? 0}</p>
+              </div>
+              <div className="bg-secondary/40 rounded p-1">
+                <span className="text-[9px] text-amber-400 uppercase font-semibold">Medium</span>
+                <p className="text-xs font-bold text-amber-400">{profileStats.gfg.byDifficulty?.medium ?? 0}</p>
+              </div>
+              <div className="bg-secondary/40 rounded p-1">
+                <span className="text-[9px] text-rose-400 uppercase font-semibold">Hard</span>
+                <p className="text-xs font-bold text-rose-400">{profileStats.gfg.byDifficulty?.hard ?? 0}</p>
+              </div>
             </div>
           </div>
         ) : (

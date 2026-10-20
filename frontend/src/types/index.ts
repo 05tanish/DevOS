@@ -411,3 +411,24 @@ export interface PriorityStats {
   estimatedFinishDate: string | null;
 }
 
+// ─── GeeksforGeeks Profile Stats ─────────────────────────────────────────────
+export interface GfgProfileStats {
+  username: string;
+  displayName: string;
+  avatar?: string;
+  institution?: string | null;
+  country?: string | null;
+  totalSolved: number;
+  totalActiveDays?: number;
+  totalContests?: number;
+  byDifficulty: {
+    school: number;
+    basic: number;
+    easy: number;
+    medium: number;
+    hard: number;
+  };
+  topicAnalysis?: { topic: string; count: number }[];
+  profileUrl: string;
+}
+

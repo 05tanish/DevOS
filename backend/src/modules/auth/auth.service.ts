@@ -77,16 +77,23 @@ export const login = async (
   ip?: string
 ) => {
   const email = dto.email.toLowerCase().trim();
+
+  // Strict access whitelist check
+  const allowedEmails = getAllowedEmails();
+  if (allowedEmails.length > 0 && !allowedEmails.includes('*') && !allowedEmails.includes(email)) {
+    throw new AppError('Access restricted. Your account is not authorized to access this workspace.', 403);
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
     throw new AppError('Invalid email or password.', 401);
   }
 
-  const isDevBypass = process.env.NODE_ENV === 'development' && dto.password === 'dev123';
+  // Strict password verification using bcrypt
   const isValid = await comparePassword(dto.password, user.password);
   
-  if (!isValid && !isDevBypass) {
+  if (!isValid) {
     throw new AppError('Invalid email or password.', 401);
   }
 

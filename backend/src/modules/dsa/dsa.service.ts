@@ -428,29 +428,106 @@ export const fetchLeetcodeStats = async (username: string) => {
 export const fetchGfgStats = async (username: string) => {
   if (!username) return null;
   const cleanUser = username.trim();
+  const cacheKey = `cache:gfg:${cleanUser}`;
   try {
-    const res = await fetch(`https://www.geeksforgeeks.org/user/${encodeURIComponent(cleanUser)}/`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-    });
-
-    if (res.ok) {
-      const html = await res.text();
-      const solvedMatch =
-        html.match(/"total_problems_solved"\s*:\s*(\d+)/i) ||
-        html.match(/"problemsSolved"\s*:\s*(\d+)/i) ||
-        html.match(/total-problems-count[^>]*>\s*(\d+)/i) ||
-        html.match(/Problems\s+Solved[^<]*<\/span><span[^>]*>(\d+)/i) ||
-        html.match(/(\d+)\s+Problems\s+Solved/i);
-
-      if (solvedMatch && solvedMatch[1]) {
-        return {
-          totalSolved: parseInt(solvedMatch[1], 10),
-        };
-      }
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
     }
+  } catch (err) {
+    console.error('❌ GFG Cache read error:', err);
+  }
+
+  try {
+    const headers = { 'accept': '*/*' };
+    const [profileRes, statsRes, summaryRes] = await Promise.allSettled([
+      fetch(`https://gfg-stats.tashif.codes/${encodeURIComponent(cleanUser)}/profile`, { headers }),
+      fetch(`https://gfg-stats.tashif.codes/${encodeURIComponent(cleanUser)}/stats`, { headers }),
+      fetch(`https://gfg-stats.tashif.codes/${encodeURIComponent(cleanUser)}`, { headers }),
+    ]);
+
+    let profileData: any = null;
+    let statsData: any = null;
+    let summaryData: any = null;
+
+    if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
+      const json = (await profileRes.value.json()) as any;
+      profileData = json?.data || json;
+    }
+
+    if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
+      const json = (await statsRes.value.json()) as any;
+      statsData = json?.data || json;
+    }
+
+    if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
+      const json = (await summaryRes.value.json()) as any;
+      summaryData = json?.data || json;
+    }
+
+    if (!profileData && !statsData && !summaryData) {
+      // Fallback to basic scrape if third-party API is unreachable
+      console.warn('⚠️ GFG API returned no data, falling back to basic scrape');
+      const res = await fetch(`https://www.geeksforgeeks.org/user/${encodeURIComponent(cleanUser)}/`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const solvedMatch =
+          html.match(/"total_problems_solved"\s*:\s*(\d+)/i) ||
+          html.match(/"problemsSolved"\s*:\s*(\d+)/i) ||
+          html.match(/total-problems-count[^>]*>\s*(\d+)/i);
+        if (solvedMatch && solvedMatch[1]) {
+          return {
+            username: cleanUser,
+            displayName: cleanUser,
+            avatar: '',
+            institution: '',
+            totalSolved: parseInt(solvedMatch[1], 10),
+            totalActiveDays: 0,
+            byDifficulty: { school: 0, basic: 0, easy: 0, medium: 0, hard: 0 },
+            topicAnalysis: [],
+            profileUrl: `https://www.geeksforgeeks.org/user/${encodeURIComponent(cleanUser)}/`,
+          };
+        }
+      }
+      return null;
+    }
+
+    const totalSolved = statsData?.totalSolved ?? summaryData?.totalSolved ?? summaryData?.totalProblemsSolved ?? 0;
+    const totalActiveDays = summaryData?.totalActiveDays ?? 0;
+    const totalContests = summaryData?.totalContests ?? 0;
+
+    const result = {
+      username: profileData?.username || cleanUser,
+      displayName: profileData?.displayName || cleanUser,
+      avatar: profileData?.avatar || '',
+      institution: profileData?.institution || '',
+      country: profileData?.country || null,
+      totalSolved,
+      totalActiveDays,
+      totalContests,
+      byDifficulty: statsData?.byDifficulty || {
+        school: 0,
+        basic: 0,
+        easy: 0,
+        medium: 0,
+        hard: 0,
+      },
+      topicAnalysis: statsData?.topicAnalysis || [],
+      profileUrl: `https://www.geeksforgeeks.org/user/${encodeURIComponent(cleanUser)}/`,
+    };
+
+    try {
+      await redis.set(cacheKey, JSON.stringify(result), 300); // 5 minutes cache
+    } catch (err) {
+      console.error('❌ GFG Cache write error:', err);
+    }
+
+    return result;
   } catch (err) {
     console.error('❌ Failed to fetch GFG stats:', err);
   }
@@ -463,9 +540,11 @@ export const getProfileStats = async (userId: string) => {
   });
   if (!profile) throw new AppError('Profile not found', 404);
 
+  const gfgUser = profile.gfgUsername || 'tanishjwaha';
+
   const [leetcode, gfg] = await Promise.all([
     profile.leetcodeUsername ? fetchLeetcodeStats(profile.leetcodeUsername) : Promise.resolve(null),
-    profile.gfgUsername ? fetchGfgStats(profile.gfgUsername) : Promise.resolve(null),
+    gfgUser ? fetchGfgStats(gfgUser) : Promise.resolve(null),
   ]);
 
   return { leetcode, gfg };

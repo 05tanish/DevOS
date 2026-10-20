@@ -2,6 +2,7 @@ import prisma from '../../config/database';
 import { AppError } from '../../middleware/error.middleware';
 import { startOfDay, endOfDay } from 'date-fns';
 import { getStreakStats } from '../github/github.service';
+import { fetchGfgStats } from '../dsa/dsa.service';
 import * as redis from '../../services/redis.service';
 
 const DEFAULT_WIDGETS = [
@@ -9,6 +10,7 @@ const DEFAULT_WIDGETS = [
   { id: 'tasks', type: 'TODAY_TASKS', visible: true, config: {} },
   { id: 'dsa', type: 'DSA_PROGRESS', visible: true, config: {} },
   { id: 'github', type: 'GITHUB_STREAK', visible: true, config: {} },
+  { id: 'gfg', type: 'GFG_PROFILE', visible: true, config: {} },
   { id: 'activityChart', type: 'ACTIVITY_CHART', visible: true, config: {} },
   { id: 'milestones', type: 'DAILY_MILESTONES', visible: true, config: {} },
   { id: 'revision', type: 'REVISION_DUE', visible: true, config: {} },
@@ -23,13 +25,14 @@ const DEFAULT_LAYOUT = [
   { i: 'tasks', x: 0, y: 4, w: 4, h: 4 },
   { i: 'dsa', x: 4, y: 4, w: 4, h: 4 },
   { i: 'github', x: 8, y: 4, w: 4, h: 4 },
-  { i: 'activityChart', x: 0, y: 8, w: 12, h: 5 },
-  { i: 'milestones', x: 0, y: 13, w: 6, h: 4 },
-  { i: 'revision', x: 6, y: 13, w: 6, h: 4 },
-  { i: 'reminders', x: 0, y: 17, w: 4, h: 4 },
-  { i: 'placement', x: 4, y: 17, w: 4, h: 4 },
-  { i: 'jobs', x: 8, y: 17, w: 4, h: 4 },
-  { i: 'notes', x: 0, y: 21, w: 12, h: 4 },
+  { i: 'gfg', x: 0, y: 8, w: 12, h: 5 },
+  { i: 'activityChart', x: 0, y: 13, w: 12, h: 5 },
+  { i: 'milestones', x: 0, y: 18, w: 6, h: 4 },
+  { i: 'revision', x: 6, y: 18, w: 6, h: 4 },
+  { i: 'reminders', x: 0, y: 22, w: 4, h: 4 },
+  { i: 'placement', x: 4, y: 22, w: 4, h: 4 },
+  { i: 'jobs', x: 8, y: 22, w: 4, h: 4 },
+  { i: 'notes', x: 0, y: 26, w: 12, h: 4 },
 ];
 
 export const getLayout = async (userId: string) => {
@@ -54,6 +57,17 @@ export const getLayout = async (userId: string) => {
     }
     if (!layout.widgets) {
       layout.widgets = DEFAULT_WIDGETS as any;
+    }
+    // Ensure 'gfg' widget is present in layout & widgets
+    const widgetsList = Array.isArray(layout.widgets) ? ([...(layout.widgets as any[])]) : [];
+    if (!widgetsList.some(w => w?.id === 'gfg')) {
+      widgetsList.push({ id: 'gfg', type: 'GFG_PROFILE', visible: true, config: {} });
+      layout.widgets = widgetsList as any;
+    }
+    const layoutList = Array.isArray(layout.layout) ? ([...(layout.layout as any[])]) : [];
+    if (!layoutList.some(l => l?.i === 'gfg')) {
+      layoutList.push({ i: 'gfg', x: 0, y: 8, w: 12, h: 5 });
+      layout.layout = layoutList as any;
     }
   }
 
@@ -116,6 +130,7 @@ export const getStats = async (userId: string) => {
     activeRemindersCount,
     activePriority,
     nextPriority,
+    userProfile,
   ] = await Promise.all([
     prisma.task.count({
       where: {
@@ -172,8 +187,13 @@ export const getStats = async (userId: string) => {
       where: { userId, status: { in: ['NOT_STARTED', 'PAUSED'] } },
       orderBy: { queuePosition: 'asc' },
     }),
+    prisma.profile.findUnique({
+      where: { userId },
+      select: { gfgUsername: true },
+    }),
   ]);
 
+  const gfgStats = await fetchGfgStats(userProfile?.gfgUsername || 'tanishjwaha');
   const learningMinutesToday = learningAgg._sum.durationMin || 0;
 
   // Convert jobs array to a { STATUS: count } map for the frontend widget
@@ -197,6 +217,7 @@ export const getStats = async (userId: string) => {
       dueRevisions,
     },
     github: githubStats,
+    gfg: gfgStats,
     learning: {
       minutesToday: learningMinutesToday,
     },

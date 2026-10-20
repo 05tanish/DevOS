@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Plus, Search, Calendar, CheckCircle2, Circle,
   Trash2, Edit2, Loader2, ArrowRight, ChevronLeft, ChevronRight,
-  CalendarArrowUp, Clock, AlertTriangle, Check, Sparkles
+  CalendarArrowUp, Clock, AlertTriangle, Check, Sparkles, CheckSquare, Square
 } from 'lucide-react';
 import { api } from '../lib/api';
 import MDEditor from '@uiw/react-md-editor';
@@ -249,6 +249,35 @@ export function PlannerPage() {
     });
   };
 
+  const allSelected = tasks.length > 0 && tasks.every(t => selectedIds.has(t.id));
+  const someSelected = selectedIds.size > 0 && !allSelected;
+
+  const handleToggleSelectAll = () => {
+    if (tasks.length === 0) return;
+    if (allSelected) {
+      setSelectedIds(new Set());
+      toast.info('Deselected all tasks');
+    } else {
+      setSelectedIds(new Set(tasks.map(t => t.id)));
+      toast.info(`Selected all ${tasks.length} task${tasks.length === 1 ? '' : 's'}`);
+    }
+  };
+
+  const handleToggleSelectColumn = (colTasks: Task[]) => {
+    if (colTasks.length === 0) return;
+    const colIds = colTasks.map(t => t.id);
+    const allColSelected = colIds.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allColSelected) {
+        colIds.forEach(id => next.delete(id));
+      } else {
+        colIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
   const handleToggleStatus = async (task: Task) => {
     const nextStatusMap: Record<TaskStatus, TaskStatus> = {
       TODO: 'IN_PROGRESS',
@@ -431,7 +460,25 @@ export function PlannerPage() {
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">Track your daily tasks, assign required hours, and manage daily workload capacity</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          {tasks.length > 0 && (
+            <Button
+              variant={allSelected ? "secondary" : "outline"}
+              onClick={handleToggleSelectAll}
+              className={cn(
+                "transition-all gap-1.5 text-xs font-semibold",
+                allSelected
+                  ? "bg-amber-500/15 border-amber-500/40 text-amber-500 hover:bg-amber-500/25"
+                  : someSelected
+                  ? "border-amber-500/30 text-amber-500/90 hover:bg-amber-500/10"
+                  : "text-muted-foreground hover:text-foreground border-border"
+              )}
+              title={allSelected ? "Deselect all visible tasks" : "Select all visible tasks"}
+            >
+              {allSelected ? <CheckSquare className="w-4 h-4 text-amber-500" /> : <Square className="w-4 h-4" />}
+              <span>{allSelected ? 'Deselect All' : someSelected ? `Select All (${tasks.length})` : `Select All (${tasks.length})`}</span>
+            </Button>
+          )}
           {selectedIds.size > 0 && (
             <Button
               variant="outline"
@@ -722,14 +769,39 @@ export function PlannerPage() {
             className="pl-9 bg-secondary/30"
           />
         </div>
-        <select
-          value={selectedPriority}
-          onChange={e => setSelectedPriority(e.target.value)}
-          className="bg-secondary border border-border text-foreground text-sm rounded-md px-3 h-10 outline-none hover:bg-secondary/80 transition-colors cursor-pointer w-full md:w-48"
-        >
-          <option value="">All Priorities</option>
-          {TASK_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          {tasks.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToggleSelectAll}
+              className={cn(
+                "h-10 px-3 text-xs font-semibold border transition-all shrink-0 flex items-center gap-2",
+                allSelected
+                  ? "bg-amber-400/15 border-amber-400/40 text-amber-400 hover:bg-amber-400/25"
+                  : someSelected
+                  ? "bg-amber-400/10 border-amber-400/30 text-amber-400 hover:bg-amber-400/20"
+                  : "bg-secondary border-border text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+              )}
+              title={allSelected ? "Deselect all visible tasks" : "Select all visible tasks"}
+            >
+              {allSelected ? (
+                <CheckSquare className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Square className="w-4 h-4 text-muted-foreground" />
+              )}
+              <span>{allSelected ? 'Deselect All' : `Select All (${tasks.length})`}</span>
+            </Button>
+          )}
+          <select
+            value={selectedPriority}
+            onChange={e => setSelectedPriority(e.target.value)}
+            className="bg-secondary border border-border text-foreground text-sm rounded-md px-3 h-10 outline-none hover:bg-secondary/80 transition-colors cursor-pointer w-full md:w-44"
+          >
+            <option value="">All Priorities</option>
+            {TASK_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Kanban Board columns */}
@@ -744,6 +816,15 @@ export function PlannerPage() {
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-border pb-2 px-1">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">To Do ({todoTasks.length})</span>
+                {todoTasks.length > 0 && (
+                  <button
+                    onClick={() => handleToggleSelectColumn(todoTasks)}
+                    className="text-[10px] text-muted-foreground hover:text-amber-400 transition-colors flex items-center gap-1 font-medium"
+                    title="Select/deselect all To Do tasks"
+                  >
+                    {todoTasks.every(t => selectedIds.has(t.id)) ? 'Deselect Col' : 'Select Col'}
+                  </button>
+                )}
               </div>
               <SortableContext items={todoTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                 <div id="TODO" className="space-y-3 overflow-y-auto max-h-[60vh] p-1 scrollbar-thin min-h-[100px]">
@@ -757,6 +838,15 @@ export function PlannerPage() {
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-border pb-2 px-1">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">In Progress ({inProgressTasks.length})</span>
+                {inProgressTasks.length > 0 && (
+                  <button
+                    onClick={() => handleToggleSelectColumn(inProgressTasks)}
+                    className="text-[10px] text-muted-foreground hover:text-amber-400 transition-colors flex items-center gap-1 font-medium"
+                    title="Select/deselect all In Progress tasks"
+                  >
+                    {inProgressTasks.every(t => selectedIds.has(t.id)) ? 'Deselect Col' : 'Select Col'}
+                  </button>
+                )}
               </div>
               <SortableContext items={inProgressTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                 <div id="IN_PROGRESS" className="space-y-3 overflow-y-auto max-h-[60vh] p-1 scrollbar-thin min-h-[100px]">
@@ -770,6 +860,15 @@ export function PlannerPage() {
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-border pb-2 px-1">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Completed ({doneTasks.length})</span>
+                {doneTasks.length > 0 && (
+                  <button
+                    onClick={() => handleToggleSelectColumn(doneTasks)}
+                    className="text-[10px] text-muted-foreground hover:text-amber-400 transition-colors flex items-center gap-1 font-medium"
+                    title="Select/deselect all Completed tasks"
+                  >
+                    {doneTasks.every(t => selectedIds.has(t.id)) ? 'Deselect Col' : 'Select Col'}
+                  </button>
+                )}
               </div>
               <SortableContext items={doneTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                 <div id="DONE" className="space-y-3 overflow-y-auto max-h-[60vh] p-1 scrollbar-thin min-h-[100px]">

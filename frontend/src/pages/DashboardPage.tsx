@@ -3,7 +3,8 @@ import RGL, { WidthProvider } from 'react-grid-layout/legacy';
 import {
   Code2, CalendarCheck,
   Bell, Target, Briefcase, FileText, TrendingUp, CheckCircle2,
-  Clock, AlertCircle, Flame, Loader2, Edit2, Check, RotateCcw, Eye, EyeOff, ListOrdered
+  Clock, AlertCircle, Flame, Loader2, Edit2, Check, RotateCcw, Eye, EyeOff, ListOrdered,
+  ExternalLink, GraduationCap
 } from 'lucide-react';
 import { Github } from '../components/ui/BrandIcons';
 import { api } from '../lib/api';
@@ -11,6 +12,7 @@ import { cn } from '../lib/utils';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
+import type { GfgProfileStats } from '../types';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer
 } from 'recharts';
@@ -30,6 +32,7 @@ interface DashStats {
   tasks: { dueToday: number; completedToday: number; pending: number };
   dsa: { totalSolved: number; dueRevisions: number };
   github: { currentStreak: number; longestStreak: number; totalCommits: number; todayCommits: number; hasCommittedToday: boolean };
+  gfg?: GfgProfileStats;
   learning: { minutesToday: number };
   jobs: Record<string, number>;
   books: { reading: { id: string; title: string; author?: string; currentPage: number; totalPages?: number }[]; count: number };
@@ -185,6 +188,205 @@ function GitHubWidget({ data, isEditing }: { data: DashStats['github']; isEditin
             </Badge>
           )}
         </div>
+      </div>
+    </Widget>
+  );
+}
+
+function GFGWidget({ data, isEditing }: { data?: GfgProfileStats; isEditing?: boolean }) {
+  if (!data) {
+    return (
+      <Widget title="GeeksforGeeks Profile" icon={GraduationCap} isEditing={isEditing}>
+        <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground gap-2">
+          <GraduationCap className="w-8 h-8 opacity-40 text-emerald-500" />
+          <p className="text-xs">No GeeksforGeeks stats connected yet.</p>
+          <span className="text-[10px] text-muted-foreground/70">Connect GFG username in Settings → Profile</span>
+        </div>
+      </Widget>
+    );
+  }
+
+  const {
+    displayName, username, avatar, institution,
+    totalSolved, totalActiveDays = 0, byDifficulty,
+    topicAnalysis = [], profileUrl
+  } = data;
+
+  const dSchool = byDifficulty?.school || 0;
+  const dBasic = byDifficulty?.basic || 0;
+  const dEasy = byDifficulty?.easy || 0;
+  const dMedium = byDifficulty?.medium || 0;
+  const dHard = byDifficulty?.hard || 0;
+  const sumDifficulty = (dSchool + dBasic + dEasy + dMedium + dHard) || totalSolved || 1;
+
+  const pSchool = (dSchool / sumDifficulty) * 100;
+  const pBasic = (dBasic / sumDifficulty) * 100;
+  const pEasy = (dEasy / sumDifficulty) * 100;
+  const pMedium = (dMedium / sumDifficulty) * 100;
+  const pHard = (dHard / sumDifficulty) * 100;
+
+  return (
+    <Widget
+      title="GeeksforGeeks Profile & Analytics"
+      icon={GraduationCap}
+      isEditing={isEditing}
+      className="overflow-hidden"
+    >
+      <div className="flex flex-col gap-3 h-full">
+        {/* Top Profile Banner */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-secondary/30 border border-border/40 p-3 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="relative shrink-0">
+              {avatar ? (
+                <img
+                  src={avatar}
+                  alt={displayName || username}
+                  className="w-11 h-11 rounded-full object-cover border-2 border-emerald-500/50 shadow-sm"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center font-bold text-white text-sm shadow-sm">
+                  {(displayName || username || 'G').slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card flex items-center justify-center" title="Live Synced">
+                <Check className="w-2 h-2 text-black stroke-[3]" />
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h4 className="text-sm font-bold text-foreground truncate">{displayName || username}</h4>
+                <span className="text-[11px] font-mono text-emerald-400">@{username}</span>
+                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                  Live API
+                </Badge>
+              </div>
+              {institution && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
+                  <GraduationCap className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70" />
+                  <span className="truncate">{institution}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+            <a
+              href={profileUrl || `https://www.geeksforgeeks.org/user/${username}/`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+            >
+              <span>View Profile</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
+
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {/* Total Solved Card */}
+          <div className="bg-secondary/40 border border-border/50 rounded-lg p-2 flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Total Solved</span>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-2xl font-black text-emerald-400 font-mono tracking-tight">{totalSolved}</span>
+              <span className="text-[10px] text-muted-foreground">solved</span>
+            </div>
+          </div>
+
+          {/* Active Days Card */}
+          <div className="bg-secondary/40 border border-border/50 rounded-lg p-2 flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Active Days</span>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-2xl font-black text-foreground font-mono tracking-tight">{totalActiveDays}</span>
+              <span className="text-[10px] text-muted-foreground">days</span>
+            </div>
+          </div>
+
+          {/* Easy / Medium Highlight */}
+          <div className="bg-secondary/40 border border-border/50 rounded-lg p-2 flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Easy / Medium</span>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-xl font-bold text-emerald-400 font-mono">{dEasy}</span>
+              <span className="text-xs text-muted-foreground">/</span>
+              <span className="text-xl font-bold text-amber-400 font-mono">{dMedium}</span>
+            </div>
+          </div>
+
+          {/* Hard Solved */}
+          <div className="bg-secondary/40 border border-border/50 rounded-lg p-2 flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Hard Solved</span>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-2xl font-black text-rose-400 font-mono tracking-tight">{dHard}</span>
+              <span className="text-[10px] text-rose-400/70 font-semibold">advanced</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Difficulty Breakdown Segmented Bar & Badges */}
+        <div className="bg-secondary/20 border border-border/30 rounded-lg p-2.5 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-semibold text-foreground flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              Difficulty Distribution
+            </span>
+            <span className="text-muted-foreground font-mono text-[10px]">{totalSolved} problems</span>
+          </div>
+
+          {/* Multi-segment progress bar */}
+          <div className="h-2 w-full bg-secondary rounded-full overflow-hidden flex shadow-inner">
+            {pSchool > 0 && <div style={{ width: `${pSchool}%` }} className="bg-slate-400 h-full transition-all" title={`School: ${dSchool}`} />}
+            {pBasic > 0 && <div style={{ width: `${pBasic}%` }} className="bg-sky-400 h-full transition-all" title={`Basic: ${dBasic}`} />}
+            {pEasy > 0 && <div style={{ width: `${pEasy}%` }} className="bg-emerald-500 h-full transition-all" title={`Easy: ${dEasy}`} />}
+            {pMedium > 0 && <div style={{ width: `${pMedium}%` }} className="bg-amber-500 h-full transition-all" title={`Medium: ${dMedium}`} />}
+            {pHard > 0 && <div style={{ width: `${pHard}%` }} className="bg-rose-500 h-full transition-all" title={`Hard: ${dHard}`} />}
+          </div>
+
+          {/* Legend Badges */}
+          <div className="grid grid-cols-5 gap-1 pt-1 text-center">
+            <div className="bg-slate-500/10 border border-slate-500/20 rounded px-1 py-0.5">
+              <p className="text-xs font-bold text-slate-300 font-mono">{dSchool}</p>
+              <p className="text-[8px] text-slate-400 uppercase font-semibold">School</p>
+            </div>
+            <div className="bg-sky-500/10 border border-sky-500/20 rounded px-1 py-0.5">
+              <p className="text-xs font-bold text-sky-400 font-mono">{dBasic}</p>
+              <p className="text-[8px] text-sky-400/80 uppercase font-semibold">Basic</p>
+            </div>
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded px-1 py-0.5">
+              <p className="text-xs font-bold text-emerald-400 font-mono">{dEasy}</p>
+              <p className="text-[8px] text-emerald-400/80 uppercase font-semibold">Easy</p>
+            </div>
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded px-1 py-0.5">
+              <p className="text-xs font-bold text-amber-400 font-mono">{dMedium}</p>
+              <p className="text-[8px] text-amber-400/80 uppercase font-semibold">Medium</p>
+            </div>
+            <div className="bg-rose-500/10 border border-rose-500/20 rounded px-1 py-0.5">
+              <p className="text-xs font-bold text-rose-400 font-mono">{dHard}</p>
+              <p className="text-[8px] text-rose-400/80 uppercase font-semibold">Hard</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Top Solved Topics Tags */}
+        {topicAnalysis.length > 0 && (
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Top Topics Solved</span>
+            <div className="flex flex-wrap gap-1.5">
+              {topicAnalysis.slice(0, 8).map((t) => (
+                <span
+                  key={t.topic}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-secondary border border-border/60 text-foreground font-medium hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-colors"
+                >
+                  <span>{t.topic}</span>
+                  <span className="font-mono text-emerald-400 font-bold text-[9px]">({t.count})</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </Widget>
   );
@@ -478,8 +680,20 @@ export function DashboardPage() {
         api.get('/dashboard/layout')
       ]);
       setStats(statsRes.data.data);
-      setLayout(statsRes.data.data ? (layoutRes.data.data?.layout || []) : []);
-      setWidgets(statsRes.data.data ? (layoutRes.data.data?.widgets || []) : []);
+      const rawLayout: LayoutItem[] = statsRes.data.data ? (layoutRes.data.data?.layout || []) : [];
+      const rawWidgets: WidgetConfig[] = statsRes.data.data ? (layoutRes.data.data?.widgets || []) : [];
+
+      const wList = [...rawWidgets];
+      if (!wList.some(w => w?.id === 'gfg')) {
+        wList.push({ id: 'gfg', type: 'GFG_PROFILE', visible: true, config: {} });
+      }
+      const lList = [...rawLayout];
+      if (!lList.some(l => l?.i === 'gfg')) {
+        lList.push({ i: 'gfg', x: 0, y: 8, w: 12, h: 5 });
+      }
+
+      setLayout(lList);
+      setWidgets(wList);
     } catch (err) {
       toast.error('Failed to load dashboard data');
     } finally {
@@ -577,6 +791,7 @@ export function DashboardPage() {
       case 'placement': return <PlacementWidget isEditing={isEditing} />;
       case 'jobs': return <JobsWidget data={stats.jobs} isEditing={isEditing} />;
       case 'notes': return <NotesWidget data={stats.notes} isEditing={isEditing} />;
+      case 'gfg': return <GFGWidget data={stats.gfg} isEditing={isEditing} />;
       case 'activityChart': return <ActivityChartWidget isEditing={isEditing} />;
       default: return null;
     }
@@ -652,7 +867,7 @@ export function DashboardPage() {
                 )}
               >
                 {w.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                {w.id.charAt(0).toUpperCase() + w.id.slice(1)} Widget
+                {w.id === 'gfg' ? 'GeeksforGeeks' : (w.id.charAt(0).toUpperCase() + w.id.slice(1))} Widget
               </button>
             ))}
           </div>
