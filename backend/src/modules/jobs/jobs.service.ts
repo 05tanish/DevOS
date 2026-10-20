@@ -1,6 +1,7 @@
 import prisma from '../../config/database';
 import { AppError } from '../../middleware/error.middleware';
-import { uploadFile, deleteFile } from '../../services/storage.service';
+import { uploadFile, deleteFile, resolveFileUrl } from '../../services/storage.service';
+
 
 export const create = async (userId: string, data: any) =>
   prisma.job.create({ data: { ...data, userId } });
@@ -31,8 +32,19 @@ export const list = async (userId: string, q: any) => {
     }),
     prisma.job.count({ where }),
   ]);
-  return { jobs, total };
+
+  // Resolve provider-tagged URLs before returning to client
+  const resolvedJobs = jobs.map((job) => ({
+    ...job,
+    resumePath: job.resumePath ? resolveFileUrl(job.resumePath) : null,
+    resume: job.resume
+      ? { ...job.resume, fileUrl: resolveFileUrl(job.resume.fileUrl) }
+      : null,
+  }));
+
+  return { jobs: resolvedJobs, total };
 };
+
 
 export const getOne = async (userId: string, id: string) => {
   const job = await prisma.job.findFirst({ 
@@ -55,8 +67,15 @@ export const getOne = async (userId: string, id: string) => {
     },
   });
   if (!job) throw new AppError('Job application not found.', 404);
-  return job;
+  return {
+    ...job,
+    resumePath: job.resumePath ? resolveFileUrl(job.resumePath) : null,
+    resume: job.resume
+      ? { ...job.resume, fileUrl: resolveFileUrl(job.resume.fileUrl) }
+      : null,
+  };
 };
+
 
 export const update = async (userId: string, id: string, data: any) => {
   const job = await prisma.job.findFirst({ where: { id, userId } });
@@ -105,19 +124,20 @@ export const uploadJobResume = async (userId: string, jobId: string, file: Expre
   }
 
   // Upload new resume file
-  const resumePath = await uploadFile(file, 'job-resumes', true);
+  const resumePath = await uploadFile(file, 'job-resumes');
 
   // Update job record
   return prisma.job.update({
     where: { id: jobId },
     data: {
       resumeFileName: file.originalname,
-      resumePath,
+      resumePath,          // raw tagged value stored in DB
       resumeSize: file.size,
       resumeUploadedAt: new Date(),
     },
   });
 };
+
 
 export const deleteJobResume = async (userId: string, jobId: string) => {
   const job = await prisma.job.findFirst({ where: { id: jobId, userId } });

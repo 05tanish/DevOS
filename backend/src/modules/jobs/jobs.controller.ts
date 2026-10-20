@@ -2,10 +2,12 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import * as service from './jobs.service';
 import { sendSuccess, sendCreated } from '../../utils/response';
+import { resolveFileUrl } from '../../services/storage.service';
 import path from 'path';
 import fs from 'fs';
 import https from 'https';
 import http from 'http';
+
 
 export const create = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try { return sendCreated(res, await service.create(req.user!.userId, req.body)); } catch (e) { next(e); }
@@ -31,9 +33,14 @@ export const uploadResume = async (req: AuthRequest, res: Response, next: NextFu
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No PDF file uploaded.' });
     const updatedJob = await service.uploadJobResume(req.user!.userId, req.params.id as string, req.file);
-    return sendSuccess(res, updatedJob, 'Resume uploaded successfully');
+    // Resolve tagged URL before returning to client
+    return sendSuccess(res, {
+      ...updatedJob,
+      resumePath: updatedJob.resumePath ? resolveFileUrl(updatedJob.resumePath) : null,
+    }, 'Resume uploaded successfully');
   } catch (e) { next(e); }
 };
+
 
 export const deleteResume = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -53,10 +60,12 @@ export const downloadResume = async (req: AuthRequest, res: Response, next: Next
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(downloadFileName)}"`);
 
-    // Check if local file or remote URL
-    if (job.resumePath.startsWith('http://') || job.resumePath.startsWith('https://')) {
-      const client = job.resumePath.startsWith('https://') ? https : http;
-      client.get(job.resumePath, (fileStream) => {
+    // Resolve provider-tagged URL (e.g. cloudinary:<id>||<url>) → actual URL
+    const resolvedPath = resolveFileUrl(job.resumePath);
+
+    if (resolvedPath.startsWith('http://') || resolvedPath.startsWith('https://')) {
+      const client = resolvedPath.startsWith('https://') ? https : http;
+      client.get(resolvedPath, (fileStream) => {
         fileStream.pipe(res);
       }).on('error', (err) => {
         console.error('Download stream error:', err);
@@ -64,9 +73,9 @@ export const downloadResume = async (req: AuthRequest, res: Response, next: Next
       });
     } else {
       // Local path fallback
-      const localPath = path.isAbsolute(job.resumePath)
-        ? job.resumePath
-        : path.join(process.cwd(), job.resumePath);
+      const localPath = path.isAbsolute(resolvedPath)
+        ? resolvedPath
+        : path.join(process.cwd(), resolvedPath);
 
       if (!fs.existsSync(localPath)) {
         return res.status(404).json({ success: false, message: 'Resume file not found on disk.' });
@@ -76,3 +85,4 @@ export const downloadResume = async (req: AuthRequest, res: Response, next: Next
     }
   } catch (e) { next(e); }
 };
+

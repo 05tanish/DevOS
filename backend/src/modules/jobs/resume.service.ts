@@ -1,12 +1,14 @@
 import prisma from '../../config/database';
 import { AppError } from '../../middleware/error.middleware';
-import { uploadFile, deleteFile } from '../../services/storage.service';
+import { uploadFile, deleteFile, resolveFileUrl } from '../../services/storage.service';
 
 export const listResumes = async (userId: string) => {
-  return prisma.resume.findMany({
+  const resumes = await prisma.resume.findMany({
     where: { userId },
     orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
   });
+  // Resolve provider-tagged URLs (e.g. cloudinary:<id>||<url>) before returning
+  return resumes.map((r) => ({ ...r, fileUrl: resolveFileUrl(r.fileUrl) }));
 };
 
 export const uploadResume = async (userId: string, file: Express.Multer.File, body: any) => {
