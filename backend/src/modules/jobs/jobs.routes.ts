@@ -18,26 +18,27 @@ router.post('/import', upload.single('screenshot'), extensionOrSessionAuth, impo
 // All other routes require standard session auth
 router.use(authenticate);
 
-// Job CRUD
+// ─── Resume General Library ──────────────────────────────────────────────────
+// IMPORTANT: These MUST be declared before /:id routes to avoid Express
+// matching the literal string "resumes" as a job ID parameter.
+router.get('/resumes', rc.list);
+router.post('/resumes', upload.single('file'), rc.upload);
+router.patch('/resumes/:id', rc.update);
+router.delete('/resumes/:id', rc.remove);
+
+// ─── Job CRUD ────────────────────────────────────────────────────────────────
 router.get('/', c.list);
 router.post('/', c.create);
 router.get('/:id', c.getOne);
 router.patch('/:id', c.update);
 router.delete('/:id', c.remove);
 
-// Per-Job Specific Resume Endpoints
+// ─── Per-Job Resume Endpoints ────────────────────────────────────────────────
 router.post('/:id/resume', upload.single('file'), c.uploadResume);
 router.delete('/:id/resume', c.deleteResume);
 router.get('/:id/resume/download', c.downloadResume);
 
-// Resume library (General)
-router.get('/resumes', rc.list);
-router.post('/resumes', upload.single('file'), rc.upload);
-router.patch('/resumes/:id', rc.update);
-router.delete('/resumes/:id', rc.remove);
-
-// Attach general library resume to a job
+// Attach a general library resume to a specific job
 router.patch('/:jobId/resume', rc.attachToJob);
 
 export default router;
-

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Plus, Search, ExternalLink, Calendar, DollarSign, MapPin,
   Trash2, Edit2, Loader2, FileText, Upload, Star, X, Eye, Download, RefreshCw,
-  Camera, AlertTriangle, Briefcase
+  Camera, AlertTriangle, Briefcase, Link2, CheckCircle2
 } from 'lucide-react';
 import { api } from '../lib/api';
 import type { Job, JobStatus } from '../types';
@@ -31,6 +31,10 @@ export function JobsPage() {
   const [resumeTab, setResumeTab] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
   const [resumeName, setResumeName] = useState('');
+  const [resumeSearch, setResumeSearch] = useState('');
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Per-job Resume state
@@ -59,31 +63,75 @@ export function JobsPage() {
 
   useEffect(() => { fetchResumes(); fetchContactsForLinking(); }, []);
 
-  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const doResumeUpload = async (file: File) => {
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      toast.error('Only PDF files are allowed.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be under 5 MB.');
+      return;
+    }
     setUploadingResume(true);
     try {
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('name', resumeName || file.name);
+      fd.append('name', resumeName.trim() || file.name.replace(/\.pdf$/i, ''));
       await api.post('/jobs/resumes', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast.success('Resume uploaded');
+      toast.success('Resume uploaded successfully');
       setResumeName('');
       fetchResumes();
-    } catch { toast.error('Upload failed'); }
-    finally { setUploadingResume(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    } catch { toast.error('Upload failed. Please try again.'); }
+    finally {
+      setUploadingResume(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
-  const handleDeleteResume = async (id: string) => {
-    if (!confirm('Delete this resume?')) return;
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await doResumeUpload(file);
+  };
+
+  const handleResumeDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    await doResumeUpload(file);
+  };
+
+  const handleDeleteResume = async (id: string, name: string) => {
+    if (!confirm(`Delete "${name}"? This will detach it from all linked jobs.`)) return;
     try { await api.delete(`/jobs/resumes/${id}`); toast.success('Resume deleted'); fetchResumes(); }
     catch { toast.error('Failed to delete resume'); }
   };
 
   const handleSetDefault = async (id: string) => {
-    try { await api.patch(`/jobs/resumes/${id}`, { isDefault: true }); fetchResumes(); }
+    try { await api.patch(`/jobs/resumes/${id}`, { isDefault: true }); toast.success('Default resume updated'); fetchResumes(); }
     catch { toast.error('Failed to set default'); }
+  };
+
+  const handleRenameResume = async (id: string) => {
+    if (!renameValue.trim()) return;
+    try {
+      await api.patch(`/jobs/resumes/${id}`, { name: renameValue.trim() });
+      toast.success('Resume renamed');
+      setRenamingId(null);
+      fetchResumes();
+    } catch { toast.error('Failed to rename resume'); }
+  };
+
+  const handleDownloadResume = (r: Resume) => {
+    const link = document.createElement('a');
+    link.href = r.fileUrl;
+    link.download = r.fileName || `${r.name}.pdf`;
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Search
@@ -345,7 +393,11 @@ export function JobsPage() {
             onClick={() => setResumeTab(v => !v)}
             className={cn('sm:w-auto', resumeTab && 'bg-primary text-primary-foreground')}
           >
-            <FileText className="w-4 h-4 mr-2" /> General Library {resumes.length > 0 && `(${resumes.length})`}
+            <FileText className="w-4 h-4 mr-2" />
+            Resume Vault
+            {resumes.length > 0 && (
+              <Badge className="ml-2 bg-primary/20 text-primary border-primary/30 text-[10px] px-1.5">{resumes.length}</Badge>
+            )}
           </Button>
           <Button onClick={handleAddJobClick} className="w-full sm:w-auto bg-primary text-primary-foreground">
             <Plus className="w-4 h-4 mr-2" /> Log Application
@@ -353,73 +405,251 @@ export function JobsPage() {
         </div>
       </div>
 
-      {/* Resume Library Panel */}
+      {/* ─── Resume Vault Panel ─────────────────────────────────────────────── */}
       {resumeTab && (
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="flex items-center justify-between border-b border-border/30 pb-3">
-            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <FileText className="w-4 h-4 text-primary" /> Global Resume Library
-            </h3>
-            <button onClick={() => setResumeTab(false)} className="text-muted-foreground hover:text-foreground">
+        <div className="bg-card border border-border rounded-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+          {/* Panel Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/40 bg-secondary/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <FileText className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Resume Vault</h3>
+                <p className="text-[11px] text-muted-foreground">Upload and manage your reusable resumes. Attach them to job applications.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setResumeTab(false)}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Upload Section */}
-          <div className="flex flex-col sm:flex-row gap-3 items-end">
-            <div className="flex-1 space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Resume Label</label>
-              <Input value={resumeName} onChange={e => setResumeName(e.target.value)} placeholder="e.g. Master Backend Resume 2026" className="bg-secondary/30" />
-            </div>
-            <Button onClick={() => fileInputRef.current?.click()} disabled={uploadingResume} className="bg-primary text-primary-foreground shrink-0">
-              {uploadingResume ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
-              Upload PDF
-            </Button>
-            <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleResumeUpload} />
-          </div>
-
-          {/* Resume List */}
-          {resumes.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border rounded-lg">
-              No general resumes uploaded yet.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {resumes.map(r => (
-                <div key={r.id} className={cn(
-                  'bg-secondary/30 border rounded-lg p-3 flex flex-col gap-2 group transition-colors',
-                  r.isDefault ? 'border-primary/50' : 'border-border'
-                )}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText className="w-4 h-4 text-primary shrink-0" />
-                      <span className="text-xs font-semibold text-foreground truncate">{r.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                      <button onClick={() => handleSetDefault(r.id)} title="Set as default" className="p-1 hover:bg-amber-500/10 rounded text-muted-foreground hover:text-amber-400">
-                        <Star className={cn('w-3 h-3', r.isDefault && 'fill-amber-400 text-amber-400')} />
-                      </button>
-                      <button onClick={() => openPdfPreview(r.fileUrl, r.name)} className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground">
-                        <Eye className="w-3 h-3" />
-                      </button>
-                      <button onClick={() => handleDeleteResume(r.id)} className="p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                    <span>{r.fileName}</span>
-                    {r.fileSize && <span>· {(r.fileSize / 1024).toFixed(0)} KB</span>}
-                  </div>
-                  {r.isDefault && (
-                    <Badge className="text-[9px] bg-primary/10 text-primary border-primary/20 w-fit">
-                      <Star className="w-2.5 h-2.5 mr-1 fill-primary" /> Default Resume
-                    </Badge>
-                  )}
+          <div className="p-5 space-y-5">
+            {/* Upload Zone */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Resume Label</label>
+                  <Input
+                    value={resumeName}
+                    onChange={e => setResumeName(e.target.value)}
+                    placeholder="e.g. Backend Engineer Resume 2026"
+                    className="bg-secondary/40 h-9"
+                  />
                 </div>
-              ))}
+                <div className="flex items-end gap-2">
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingResume}
+                    className="bg-primary text-primary-foreground h-9 px-4 shrink-0"
+                  >
+                    {uploadingResume
+                      ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      : <Upload className="w-4 h-4 mr-2" />
+                    }
+                    {uploadingResume ? 'Uploading...' : 'Upload PDF'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Drag-and-drop zone */}
+              <div
+                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={handleResumeDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  'border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all',
+                  isDragOver
+                    ? 'border-primary bg-primary/5 scale-[1.01]'
+                    : 'border-border/50 hover:border-primary/40 hover:bg-secondary/30'
+                )}
+              >
+                {uploadingResume ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                    <p className="text-sm text-muted-foreground font-medium">Uploading resume...</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={cn('p-3 rounded-full transition-colors', isDragOver ? 'bg-primary/20' : 'bg-secondary/60')}>
+                      <Upload className={cn('w-5 h-5', isDragOver ? 'text-primary' : 'text-muted-foreground')} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {isDragOver ? 'Drop your PDF here' : 'Drag & drop PDF here'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">or click to browse · PDF only · max 5 MB</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleResumeUpload} />
             </div>
-          )}
+
+            {/* Search + count */}
+            {resumes.length > 0 && (
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    value={resumeSearch}
+                    onChange={e => setResumeSearch(e.target.value)}
+                    placeholder="Search resumes..."
+                    className="pl-8 h-9 bg-secondary/40 text-sm"
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0 font-mono">
+                  {resumes.filter(r => r.name.toLowerCase().includes(resumeSearch.toLowerCase())).length} / {resumes.length}
+                </span>
+              </div>
+            )}
+
+            {/* Resume Cards */}
+            {resumes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center gap-3 border border-dashed border-border rounded-xl">
+                <div className="p-4 rounded-full bg-secondary/50">
+                  <FileText className="w-8 h-8 text-muted-foreground/50" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">No resumes in your vault yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Upload your first resume above to get started.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {resumes
+                  .filter(r => r.name.toLowerCase().includes(resumeSearch.toLowerCase()) || r.fileName?.toLowerCase().includes(resumeSearch.toLowerCase()))
+                  .map(r => {
+                    const usedByJobs = jobs.filter(j => j.resumeId === r.id).length;
+                    const isRenaming = renamingId === r.id;
+                    return (
+                      <div
+                        key={r.id}
+                        className={cn(
+                          'bg-card border rounded-xl p-4 flex flex-col gap-3 transition-all hover:shadow-md',
+                          r.isDefault
+                            ? 'border-primary/40 bg-primary/[0.02] shadow-sm'
+                            : 'border-border hover:border-muted-foreground/30'
+                        )}
+                      >
+                        {/* Card Header */}
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-lg bg-secondary/60 shrink-0">
+                            <FileText className="w-4 h-4 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            {isRenaming ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  value={renameValue}
+                                  onChange={e => setRenameValue(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') handleRenameResume(r.id);
+                                    if (e.key === 'Escape') setRenamingId(null);
+                                  }}
+                                  autoFocus
+                                  className="h-7 text-xs bg-secondary"
+                                />
+                                <button
+                                  onClick={() => handleRenameResume(r.id)}
+                                  className="p-1 rounded text-emerald-400 hover:bg-emerald-400/10"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setRenamingId(null)}
+                                  className="p-1 rounded text-muted-foreground hover:bg-secondary"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <p className="text-xs font-bold text-foreground leading-tight truncate" title={r.name}>{r.name}</p>
+                            )}
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {r.isDefault && (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded px-1.5 py-0.5 uppercase tracking-wide">
+                                  <Star className="w-2.5 h-2.5 fill-amber-400" /> Default
+                                </span>
+                              )}
+                              {usedByJobs > 0 && (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-primary bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5">
+                                  <Link2 className="w-2.5 h-2.5" /> {usedByJobs} job{usedByJobs > 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* File meta */}
+                        <div className="text-[10px] text-muted-foreground space-y-0.5">
+                          <div className="flex items-center justify-between">
+                            <span className="truncate font-mono" title={r.fileName}>{r.fileName}</span>
+                            {r.fileSize && <span className="font-mono shrink-0 ml-2">{(r.fileSize / 1024).toFixed(0)} KB</span>}
+                          </div>
+                          {r.createdAt && (
+                            <p className="text-muted-foreground/70">
+                              Uploaded {new Date(r.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Action Buttons — always visible */}
+                        <div className="flex items-center gap-1 pt-1 border-t border-border/40">
+                          <button
+                            onClick={() => openPdfPreview(r.fileUrl, r.name)}
+                            title="Preview PDF"
+                            className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-semibold rounded-md bg-secondary/60 hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors"
+                          >
+                            <Eye className="w-3 h-3" /> Preview
+                          </button>
+                          <button
+                            onClick={() => handleDownloadResume(r)}
+                            title="Download PDF"
+                            className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-semibold rounded-md bg-secondary/60 hover:bg-secondary text-muted-foreground transition-colors"
+                          >
+                            <Download className="w-3 h-3" /> Download
+                          </button>
+                          <button
+                            onClick={() => {
+                              setRenamingId(r.id);
+                              setRenameValue(r.name);
+                            }}
+                            title="Rename"
+                            className="p-1.5 rounded-md bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleSetDefault(r.id)}
+                            title={r.isDefault ? 'Already default' : 'Set as default'}
+                            className={cn(
+                              'p-1.5 rounded-md transition-colors',
+                              r.isDefault
+                                ? 'bg-amber-400/20 text-amber-400'
+                                : 'bg-secondary/60 hover:bg-amber-400/10 text-muted-foreground hover:text-amber-400'
+                            )}
+                          >
+                            <Star className={cn('w-3 h-3', r.isDefault && 'fill-amber-400')} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteResume(r.id, r.name)}
+                            title="Delete resume"
+                            className="p-1.5 rounded-md bg-secondary/60 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
