@@ -391,12 +391,16 @@ export function CollegePlacementPage() {
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium mb-1 block">Company *</label>
-                <Input value={company} onChange={(e) => setCompany(e.target.value)} />
+                <label className="text-sm font-medium mb-1 block">
+                  Company <span className="text-red-500 font-bold ml-0.5">*</span>
+                </label>
+                <Input value={company} onChange={(e) => setCompany(e.target.value)} required />
               </div>
               <div>
-                <label className="text-sm font-medium mb-1 block">Role *</label>
-                <Input value={role} onChange={(e) => setRole(e.target.value)} />
+                <label className="text-sm font-medium mb-1 block">
+                  Role <span className="text-red-500 font-bold ml-0.5">*</span>
+                </label>
+                <Input value={role} onChange={(e) => setRole(e.target.value)} required />
               </div>
             </div>
 

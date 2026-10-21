@@ -889,8 +889,10 @@ export function PlannerPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Task Title *</label>
-              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Design placement revision templates" className="bg-secondary" />
+              <label className="text-xs font-medium text-muted-foreground">
+                Task Title <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
+              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Design placement revision templates" className="bg-secondary" required />
             </div>
 
             <div className="space-y-1">

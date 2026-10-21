@@ -93,24 +93,48 @@ export default function HackathonsPage() {
   const openEdit = (h: Hackathon) => {
     setEditing(h);
     setForm({
-      name: h.name, teamMembers: h.teamMembers.join(', '), idea: h.idea || '',
-      techStack: h.techStack.join(', '), deadline: h.deadline ? h.deadline.split('T')[0] : '',
-      status: h.status, prize: h.prize || '', prizePool: h.prizePool || '',
-      registrationLink: h.registrationLink || '', submissionLink: h.submissionLink || '',
-      githubUrl: h.githubUrl || '', demoUrl: h.demoUrl || '',
-      teamStatus: h.teamStatus || '', learnings: h.learnings || '', notes: h.notes || '',
+      name: h.name || '',
+      teamMembers: Array.isArray(h.teamMembers) ? h.teamMembers.join(', ') : (h.teamMembers || ''),
+      idea: h.idea || '',
+      techStack: Array.isArray(h.techStack) ? h.techStack.join(', ') : (h.techStack || ''),
+      deadline: h.deadline ? h.deadline.split('T')[0] : '',
+      status: h.status || 'REGISTERED',
+      prize: h.prize || '',
+      prizePool: h.prizePool || '',
+      registrationLink: h.registrationLink || '',
+      submissionLink: h.submissionLink || '',
+      githubUrl: h.githubUrl || '',
+      demoUrl: h.demoUrl || '',
+      teamStatus: h.teamStatus || '',
+      learnings: h.learnings || '',
+      notes: h.notes || '',
     });
     setFormOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.name.trim()) {
+      toast.error('Hackathon name is required');
+      return;
+    }
     const payload = {
-      ...form,
-      teamMembers: form.teamMembers.split(',').map(s => s.trim()).filter(Boolean),
-      techStack: form.techStack.split(',').map(s => s.trim()).filter(Boolean),
-      tags: [],
+      name: form.name.trim(),
+      status: form.status,
+      idea: form.idea.trim() || undefined,
+      teamMembers: form.teamMembers ? form.teamMembers.split(',').map(s => s.trim()).filter(Boolean) : [],
+      techStack: form.techStack ? form.techStack.split(',').map(s => s.trim()).filter(Boolean) : [],
       deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
+      prize: form.prize.trim() || undefined,
+      prizePool: form.prizePool.trim() || undefined,
+      registrationLink: form.registrationLink.trim() || undefined,
+      submissionLink: form.submissionLink.trim() || undefined,
+      githubUrl: form.githubUrl.trim() || undefined,
+      demoUrl: form.demoUrl.trim() || undefined,
+      teamStatus: form.teamStatus.trim() || undefined,
+      learnings: form.learnings.trim() || undefined,
+      notes: form.notes.trim() || undefined,
+      tags: [],
     };
     try {
       if (editing) {
@@ -124,7 +148,9 @@ export default function HackathonsPage() {
       setFormOpen(false);
       fetchAll();
       fetchStats();
-    } catch { toast.error('Failed to save hackathon'); }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save hackathon');
+    }
   };
 
   const handleDelete = async () => {
@@ -208,13 +234,13 @@ export default function HackathonsPage() {
                 {h.idea && <CardDescription className="mt-1 line-clamp-2">{h.idea}</CardDescription>}
               </CardHeader>
               <CardContent className="space-y-3">
-                {h.teamMembers.length > 0 && (
+                {h.teamMembers?.length > 0 && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Users className="w-4 h-4" />
                     <span>{h.teamMembers.length} member{h.teamMembers.length !== 1 ? 's' : ''}</span>
                   </div>
                 )}
-                {h.techStack.length > 0 && (
+                {h.techStack?.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {h.techStack.slice(0, 3).map((t, i) => <Badge key={i} variant="outline" className="text-xs">{t}</Badge>)}
                     {h.techStack.length > 3 && <Badge variant="outline" className="text-xs">+{h.techStack.length - 3}</Badge>}
@@ -258,12 +284,16 @@ export default function HackathonsPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label>Name *</Label>
+              <Label>
+                Name <span className="text-red-500 font-bold ml-0.5">*</span>
+              </Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Hack The North 2026" required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Status</Label>
+                <Label>
+                  Status <span className="text-red-500 font-bold ml-0.5">*</span>
+                </Label>
                 <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.icon} {s.label}</SelectItem>)}</SelectContent>
@@ -378,7 +408,7 @@ export default function HackathonsPage() {
                   )}
                 </div>
                 {detailItem.idea && <p className="text-sm text-muted-foreground">{detailItem.idea}</p>}
-                {detailItem.teamMembers.length > 0 && (
+                {detailItem.teamMembers?.length > 0 && (
                   <div>
                     <p className="text-sm font-medium mb-1">Team</p>
                     <div className="flex flex-wrap gap-2">
@@ -386,7 +416,7 @@ export default function HackathonsPage() {
                     </div>
                   </div>
                 )}
-                {detailItem.techStack.length > 0 && (
+                {detailItem.techStack?.length > 0 && (
                   <div>
                     <p className="text-sm font-medium mb-1">Tech Stack</p>
                     <div className="flex flex-wrap gap-1">

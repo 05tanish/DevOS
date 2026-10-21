@@ -348,7 +348,9 @@ export default function ProjectsPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label>Name *</Label>
+              <Label>
+                Name <span className="text-red-500 font-bold ml-0.5">*</span>
+              </Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="My awesome project" required />
             </div>
             <div>

@@ -177,8 +177,10 @@ export function GitHubPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Commits count *</label>
-              <Input type="number" min="0" value={commits} onChange={e => setCommits(Number(e.target.value))} />
+              <label className="text-xs font-medium text-muted-foreground">
+                Commits count <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
+              <Input type="number" min="0" value={commits} onChange={e => setCommits(Number(e.target.value))} required />
             </div>
 
             <div className="space-y-1">

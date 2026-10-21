@@ -435,8 +435,10 @@ export function SettingsPage() {
                 <form onSubmit={handleProfileSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Display Name *</label>
-                      <Input value={name} onChange={e => setName(e.target.value)} placeholder="Display Name" />
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Display Name <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
+                      <Input value={name} onChange={e => setName(e.target.value)} placeholder="Display Name" required />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-medium text-muted-foreground">Backup Email</label>

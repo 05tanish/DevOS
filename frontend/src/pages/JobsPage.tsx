@@ -903,12 +903,16 @@ export function JobsPage() {
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Company Name *</label>
-                <Input value={company} onChange={e => setCompany(e.target.value)} placeholder="e.g. Google" />
+                <label className="text-xs font-medium text-muted-foreground">
+                  Company Name <span className="text-red-500 font-bold ml-0.5">*</span>
+                </label>
+                <Input value={company} onChange={e => setCompany(e.target.value)} placeholder="e.g. Google" required />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Role / Position *</label>
-                <Input value={role} onChange={e => setRole(e.target.value)} placeholder="e.g. Backend Engineer" />
+                <label className="text-xs font-medium text-muted-foreground">
+                  Role / Position <span className="text-red-500 font-bold ml-0.5">*</span>
+                </label>
+                <Input value={role} onChange={e => setRole(e.target.value)} placeholder="e.g. Backend Engineer" required />
               </div>
             </div>
 

@@ -75,17 +75,6 @@ function SortablePriorityCard({
         isDragging && 'opacity-50 border-primary cursor-grabbing shadow-lg'
       )}
     >
-      {/* Deadline Indicator */}
-      {priority.deadline && priority.status !== 'COMPLETED' && (
-        <div className="absolute top-3 right-3 flex items-center gap-1 text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-bold">
-          <Clock className="w-3 h-3" />
-          {(() => {
-            const days = Math.ceil((new Date(priority.deadline).getTime() - Date.now()) / 86400000);
-            return days < 0 ? 'Overdue' : `${days}d left`;
-          })()}
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -112,7 +101,22 @@ function SortablePriorityCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+          {priority.deadline && priority.status !== 'COMPLETED' && (() => {
+            const days = Math.ceil((new Date(priority.deadline).getTime() - Date.now()) / 86400000);
+            const isOverdue = days < 0;
+            return (
+              <span className={cn(
+                "inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider",
+                isOverdue
+                  ? "bg-red-500/10 text-red-400 border-red-500/30"
+                  : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+              )}>
+                <Clock className="w-3 h-3" />
+                {isOverdue ? 'Overdue' : `${days}d left`}
+              </span>
+            );
+          })()}
           <Badge className={cn('text-[9px] uppercase font-bold border', LEVEL_COLORS[priority.priorityLevel])}>
             {priority.priorityLevel}
           </Badge>
@@ -680,7 +684,9 @@ export default function PriorityPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">Title *</label>
+              <label className="text-xs font-semibold text-muted-foreground">
+                Title <span className="text-red-500 font-bold">*</span>
+              </label>
               <Input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -711,11 +717,14 @@ export default function PriorityPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Priority Level</label>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Priority Level <span className="text-red-500 font-bold">*</span>
+                </label>
                 <select
                   value={formData.priorityLevel}
                   onChange={(e) => setFormData({ ...formData, priorityLevel: e.target.value as PriorityLevel })}
                   className="w-full h-9 px-2.5 bg-secondary border border-border rounded-md text-xs text-foreground focus:outline-none"
+                  required
                 >
                   <option value="CRITICAL">Critical</option>
                   <option value="HIGH">High</option>
@@ -727,21 +736,27 @@ export default function PriorityPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Est. Total Hours</label>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Est. Total Hours <span className="text-red-500 font-bold">*</span>
+                </label>
                 <Input
                   type="number"
                   min="1"
+                  required
                   value={formData.estimatedTotalHours}
                   onChange={(e) => setFormData({ ...formData, estimatedTotalHours: Number(e.target.value) })}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Daily Hours Allocation</label>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Daily Hours Allocation <span className="text-red-500 font-bold">*</span>
+                </label>
                 <Input
                   type="number"
                   min="0.5"
                   step="0.5"
+                  required
                   value={formData.dailyHoursAlloc}
                   onChange={(e) => setFormData({ ...formData, dailyHoursAlloc: Number(e.target.value) })}
                 />

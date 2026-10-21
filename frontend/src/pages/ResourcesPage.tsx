@@ -366,8 +366,10 @@ export function ResourcesPage() {
           </DialogHeader>
           <form onSubmit={handleFolderSubmit} className="space-y-4 pt-2">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Folder Name *</label>
-              <Input value={folderName} onChange={e => setFolderName(e.target.value)} placeholder="e.g. System Design Cheat sheets" />
+              <label className="text-xs font-medium text-muted-foreground">
+                Folder Name <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
+              <Input value={folderName} onChange={e => setFolderName(e.target.value)} placeholder="e.g. System Design Cheat sheets" required />
             </div>
             <DialogFooter className="pt-2">
               <Button type="button" variant="ghost" onClick={() => setIsFolderOpen(false)}>Cancel</Button>
@@ -385,8 +387,10 @@ export function ResourcesPage() {
           </DialogHeader>
           <form onSubmit={handleResourceSubmit} className="space-y-4 pt-2">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Resource Title *</label>
-              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Clean Code Architecture Guide" />
+              <label className="text-xs font-medium text-muted-foreground">
+                Resource Title <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
+              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Clean Code Architecture Guide" required />
             </div>
 
             <div className="grid grid-cols-2 gap-4">

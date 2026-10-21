@@ -464,19 +464,24 @@ export function DsaConceptsPage() {
           <div className="space-y-4">
             {/* Topic */}
             <div className="space-y-1.5">
-              <Label htmlFor="topic">Topic Name *</Label>
+              <Label htmlFor="topic">
+                Topic Name <span className="text-red-500 font-bold ml-0.5">*</span>
+              </Label>
               <Input
                 id="topic"
                 placeholder="e.g. Two Sum Pattern"
                 value={form.topic}
                 onChange={e => setForm(f => ({ ...f, topic: e.target.value }))}
+                required
               />
             </div>
 
             {/* Category + Difficulty + Language */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label>Category *</Label>
+                <Label>
+                  Category <span className="text-red-500 font-bold ml-0.5">*</span>
+                </Label>
                 <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

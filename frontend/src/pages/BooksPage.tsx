@@ -465,8 +465,10 @@ export function BooksPage() {
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Book Title *</label>
-                <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Designing Data-Intensive Applications" />
+                <label className="text-xs font-medium text-muted-foreground">
+                  Book Title <span className="text-red-500 font-bold ml-0.5">*</span>
+                </label>
+                <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Designing Data-Intensive Applications" required />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Author / Publisher</label>

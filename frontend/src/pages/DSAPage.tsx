@@ -736,8 +736,10 @@ export function DSAPage() {
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Problem Name *</label>
-                <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Two Sum" className="bg-secondary" />
+                <label className="text-xs font-medium text-muted-foreground">
+                  Problem Name <span className="text-red-500 font-bold ml-0.5">*</span>
+                </label>
+                <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Two Sum" className="bg-secondary" required />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Platform</label>

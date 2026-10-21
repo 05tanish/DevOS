@@ -1198,6 +1198,10 @@ model Hackathon {
   deadline        DateTime?
   status          HackathonStatus @default(REGISTERED)
   prize           String?
+  prizePool       String?
+  registrationLink String?
+  teamStatus      String?
+  tags            String[]        @default([])
   learnings       String?
   notes           String?
   createdAt       DateTime        @default(now())
