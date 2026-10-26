@@ -72,6 +72,8 @@ A drag-and-drop pipeline tracker with six stages:
 Wishlist  →  Applied  →  OA  →  Interview  →  Rejected  →  Offer
 ```
 
+**NEW**: AI-powered job extraction from screenshots! Drop an image of a job posting and let Gemini Vision API automatically extract company, role, location, salary, skills, and more. [Learn more →](./docs/JOB_IMAGE_EXTRACTION.md)
+
 <br />
 
 ### 🧩 &nbsp;Job Capture Extension

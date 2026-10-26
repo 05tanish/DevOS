@@ -15,6 +15,9 @@ const upload = multer({
 // Extension import endpoint (accepts both extension token and session auth)
 router.post('/import', upload.single('screenshot'), extensionOrSessionAuth, importCtrl.importJobHandler);
 
+// Drag-and-drop screenshot upload endpoint (requires session auth)
+router.post('/extract-from-image', authenticate, upload.single('screenshot'), importCtrl.extractFromImageHandler);
+
 // All other routes require standard session auth
 router.use(authenticate);
 

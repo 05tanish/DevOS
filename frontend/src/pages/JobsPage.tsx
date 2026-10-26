@@ -49,6 +49,13 @@ export function JobsPage() {
   // Job Review Modal State
   const [reviewingJob, setReviewingJob] = useState<Job | null>(null);
 
+  // Drag-and-Drop Job Image Extraction State
+  const [jobImageDragOver, setJobImageDragOver] = useState(false);
+  const [extractingFromImage, setExtractingFromImage] = useState(false);
+  const [extractedJobData, setExtractedJobData] = useState<any>(null);
+  const [showExtractionPreview, setShowExtractionPreview] = useState(false);
+  const jobImageInputRef = useRef<HTMLInputElement>(null);
+
   const fetchResumes = async () => {
     try { const r = await api.get('/jobs/resumes'); setResumes(r.data.data || []); }
     catch (_) {}
@@ -100,6 +107,89 @@ export function JobsPage() {
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
     await doResumeUpload(file);
+  };
+
+  // Drag-and-Drop Job Image Extraction Handlers
+  const handleJobImageDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setJobImageDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    await extractJobFromImage(file);
+  };
+
+  const handleJobImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await extractJobFromImage(file);
+  };
+
+  const extractJobFromImage = async (file: File) => {
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only PNG, JPEG, and WebP images are allowed.');
+      return;
+    }
+
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image size must be under 10 MB.');
+      return;
+    }
+
+    setExtractingFromImage(true);
+    try {
+      const fd = new FormData();
+      fd.append('screenshot', file);
+
+      const res = await api.post('/jobs/extract-from-image', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      if (res.data.success) {
+        setExtractedJobData(res.data.data);
+        setShowExtractionPreview(true);
+        toast.success('Job info extracted! Review and save below.');
+      } else {
+        toast.error('Failed to extract job information from image.');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to extract job information');
+    } finally {
+      setExtractingFromImage(false);
+      if (jobImageInputRef.current) jobImageInputRef.current.value = '';
+    }
+  };
+
+  const handleSaveExtractedJob = async () => {
+    if (!extractedJobData) return;
+
+    const payload = {
+      company: extractedJobData.company || 'Unknown',
+      role: extractedJobData.role || 'Untitled Position',
+      jobUrl: '',
+      status: 'WISHLIST',
+      appliedDate: new Date().toISOString(),
+      location: extractedJobData.location || '',
+      salary: extractedJobData.salary || '',
+      notes: extractedJobData.description || '',
+    };
+
+    try {
+      await api.post('/jobs', payload);
+      toast.success('Job saved successfully!');
+      setShowExtractionPreview(false);
+      setExtractedJobData(null);
+      fetchJobs();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save job');
+    }
+  };
+
+  const handleDiscardExtractedJob = () => {
+    setShowExtractionPreview(false);
+    setExtractedJobData(null);
   };
 
   const handleDeleteResume = async (id: string, name: string) => {
@@ -402,6 +492,179 @@ export function JobsPage() {
           <Button onClick={handleAddJobClick} className="w-full sm:w-auto bg-primary text-primary-foreground">
             <Plus className="w-4 h-4 mr-2" /> Log Application
           </Button>
+        </div>
+      </div>
+
+      {/* ─── AI Job Extraction from Image Panel ─────────────────────────────── */}
+      <div className="bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-primary/20 bg-primary/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/20">
+              <Camera className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                AI-Powered Job Extraction
+                <Badge variant="outline" className="text-[9px] font-normal bg-primary/10 border-primary/30">
+                  Gemini Vision
+                </Badge>
+              </h3>
+              <p className="text-[11px] text-muted-foreground">Drop a screenshot or image of a job posting to auto-extract details</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5">
+          {/* Hidden File Input for Job Image Upload */}
+          <input
+            ref={jobImageInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            className="hidden"
+            onChange={handleJobImageSelect}
+          />
+
+          {/* Drag-and-Drop Zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setJobImageDragOver(true); }}
+            onDragLeave={() => setJobImageDragOver(false)}
+            onDrop={handleJobImageDrop}
+            onClick={() => jobImageInputRef.current?.click()}
+            className={cn(
+              'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all',
+              jobImageDragOver
+                ? 'border-primary bg-primary/10 scale-[1.01] shadow-lg'
+                : 'border-primary/40 hover:border-primary/60 hover:bg-primary/5'
+            )}
+          >
+            {extractingFromImage ? (
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                <div>
+                  <p className="text-sm font-bold text-foreground">Extracting job information...</p>
+                  <p className="text-xs text-muted-foreground mt-1">AI is analyzing the image</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3">
+                <div className={cn(
+                  'p-4 rounded-full transition-all',
+                  jobImageDragOver ? 'bg-primary/30 scale-110' : 'bg-primary/20'
+                )}>
+                  <Camera className={cn('w-8 h-8 text-primary', jobImageDragOver && 'animate-pulse')} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-foreground">
+                    {jobImageDragOver ? 'Drop your screenshot here!' : 'Drag & drop job screenshot'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    or click to browse · PNG, JPEG, WebP · max 10 MB
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="secondary" className="text-[10px] font-mono bg-primary/10">
+                    ✨ Auto-extracts company, role, location & more
+                  </Badge>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Extracted Job Preview */}
+          {showExtractionPreview && extractedJobData && (
+            <div className="mt-5 bg-card border border-border rounded-xl p-5 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-emerald-500/10">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">Extracted Information</h4>
+                    <p className="text-[11px] text-muted-foreground">Review and edit before saving</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleDiscardExtractedJob}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Company</label>
+                  <Input
+                    value={extractedJobData.company}
+                    onChange={(e) => setExtractedJobData({ ...extractedJobData, company: e.target.value })}
+                    className="bg-secondary/40"
+                    placeholder="Company name"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Role/Position</label>
+                  <Input
+                    value={extractedJobData.role}
+                    onChange={(e) => setExtractedJobData({ ...extractedJobData, role: e.target.value })}
+                    className="bg-secondary/40"
+                    placeholder="Job title"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Location</label>
+                  <Input
+                    value={extractedJobData.location}
+                    onChange={(e) => setExtractedJobData({ ...extractedJobData, location: e.target.value })}
+                    className="bg-secondary/40"
+                    placeholder="Location"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Salary</label>
+                  <Input
+                    value={extractedJobData.salary}
+                    onChange={(e) => setExtractedJobData({ ...extractedJobData, salary: e.target.value })}
+                    className="bg-secondary/40"
+                    placeholder="e.g., $100k - $150k"
+                  />
+                </div>
+                {extractedJobData.skills && extractedJobData.skills.length > 0 && (
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Skills Detected</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {extractedJobData.skills.map((skill: string, idx: number) => (
+                        <Badge key={idx} variant="secondary" className="text-[10px] bg-primary/10 border-primary/20">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {extractedJobData.description && (
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</label>
+                    <textarea
+                      value={extractedJobData.description}
+                      onChange={(e) => setExtractedJobData({ ...extractedJobData, description: e.target.value })}
+                      className="w-full min-h-[80px] p-3 text-sm bg-secondary/40 border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Job description..."
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                <Button onClick={handleSaveExtractedJob} className="flex-1 bg-primary text-primary-foreground">
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Save Job
+                </Button>
+                <Button onClick={handleDiscardExtractedJob} variant="outline" className="flex-1">
+                  <X className="w-4 h-4 mr-2" />
+                  Discard
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

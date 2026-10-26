@@ -95,6 +95,93 @@ export const importJobHandler = async (
   }
 };
 
+/**
+ * POST /api/jobs/extract-from-image
+ * Drag-and-drop image upload endpoint.
+ * Extracts job info using AI and returns structured data for manual review.
+ */
+export const extractFromImageHandler = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user!.userId;
+    const screenshotFile = req.file;
+
+    if (!screenshotFile) {
+      return sendError(res, 'No image file provided', 400);
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(screenshotFile.mimetype)) {
+      return sendError(res, 'Invalid image format. Allowed: PNG, JPEG, WebP', 400);
+    }
+
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024;
+    if (screenshotFile.size > maxSize) {
+      return sendError(res, 'Image too large. Max 10MB', 400);
+    }
+
+    // Extract info from screenshot using Vision AI
+    const { extractJobFromScreenshot } = require('../../services/vision-ai.service');
+    const aiResult = await extractJobFromScreenshot(
+      screenshotFile.buffer,
+      screenshotFile.mimetype
+    );
+
+    if (!aiResult.success) {
+      return sendError(res, aiResult.error || 'Failed to extract job information', 500);
+    }
+
+    // Format salary if available
+    const formatSalary = (min: number | null, max: number | null): string | null => {
+      if (!min && !max) return null;
+      if (min && max) return `${min} - ${max}`;
+      if (min) return `${min}+`;
+      return `Up to ${max}`;
+    };
+
+    // Return extracted data for user to review and save
+    const extractedData = {
+      company: aiResult.data.company || '',
+      role: aiResult.data.title || '',
+      location: aiResult.data.location || '',
+      description: aiResult.data.description || '',
+      salary: formatSalary(aiResult.data.salaryMin, aiResult.data.salaryMax) || '',
+      employmentType: aiResult.data.employmentType || '',
+      skills: aiResult.data.skills || [],
+      education: aiResult.data.education || [],
+      experienceMin: aiResult.data.experienceMin,
+      experienceMax: aiResult.data.experienceMax,
+      salaryMin: aiResult.data.salaryMin,
+      salaryMax: aiResult.data.salaryMax,
+      postedDate: aiResult.data.postedDate,
+    };
+
+    logActivity({
+      userId,
+      action: 'job.extract_from_image',
+      entity: 'job',
+      metadata: {
+        extractionMethod: 'drag_drop_ai',
+        hasCompany: !!extractedData.company,
+        hasRole: !!extractedData.role,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: extractedData,
+      message: 'Job information extracted successfully',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 /** Basic HTML/script sanitization */
 function sanitize(str: string): string {
   return str
